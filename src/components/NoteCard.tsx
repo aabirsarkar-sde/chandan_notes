@@ -83,8 +83,7 @@ export function NoteCard({ note }: NoteCardProps) {
 
         {note.text ? (
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-medium uppercase tracking-wide opacity-70">Text</p>
+            <div className="flex items-center justify-end">
               <button
                 aria-label="Copy note text"
                 className="inline-flex items-center gap-1 rounded-full border border-current/20 px-2.5 py-1 text-xs font-medium transition hover:bg-black/5 dark:hover:bg-white/10"
@@ -96,7 +95,7 @@ export function NoteCard({ note }: NoteCardProps) {
               </button>
             </div>
             <textarea
-              className="min-h-24 w-full resize-y rounded-2xl border border-current/15 bg-transparent px-3 py-2 text-sm leading-6 opacity-90 outline-none transition focus:border-current/40 focus:ring-2 focus:ring-current/20"
+              className="min-h-0 w-full resize-none bg-transparent p-0 text-sm leading-6 opacity-90 outline-none"
               onChange={(event) => setEditableText(event.target.value)}
               spellCheck={false}
               value={editableText}
