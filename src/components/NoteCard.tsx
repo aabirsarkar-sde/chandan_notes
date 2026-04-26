@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, Copy, ExternalLink, ImageIcon, Pin } from "lucide-react";
 import Image from "next/image";
 import { formatNoteDate, linkifyText, noteColorClasses } from "@/lib/notes";
@@ -10,48 +10,32 @@ type NoteCardProps = {
   note: KeepNote;
 };
 
-const TEXT_OVERRIDES_STORAGE_KEY = "keep_archive_text_overrides";
-
 export function NoteCard({ note }: NoteCardProps) {
-  const [editableText, setEditableText] = useState(note.text || "");
   const [copied, setCopied] = useState(false);
   const editedDate = formatNoteDate(note.editedAt || note.createdAt);
-  const hasBody = Boolean(editableText || note.listItems.length || note.annotations.length);
+  const hasBody = Boolean(note.text || note.listItems.length || note.annotations.length);
 
-  useEffect(() => {
-    const savedOverrides = readTextOverrides();
-    setEditableText(savedOverrides[note.id] ?? note.text ?? "");
-  }, [note.id, note.text]);
-
-  useEffect(() => {
-    const savedOverrides = readTextOverrides();
-    const originalText = note.text || "";
-
-    if (editableText === originalText) {
-      if (savedOverrides[note.id]) {
-        delete savedOverrides[note.id];
-        writeTextOverrides(savedOverrides);
-      }
-      return;
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const parts = [];
+    if (note.title) parts.push(note.title);
+    if (note.text) parts.push(note.text);
+    if (note.listItems.length > 0) {
+      parts.push(
+        note.listItems.map((item) => `${item.checked ? "[x]" : "[ ]"} ${item.text}`).join("\n")
+      );
     }
-
-    savedOverrides[note.id] = editableText;
-    writeTextOverrides(savedOverrides);
-  }, [editableText, note.id, note.text]);
-
-  async function handleCopy() {
-    if (!editableText) {
-      return;
-    }
-
-    await navigator.clipboard.writeText(editableText);
+    
+    navigator.clipboard.writeText(parts.join("\n\n"));
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1400);
-  }
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <article
-      className={`mb-5 break-inside-avoid overflow-hidden rounded-3xl border shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-xl ${noteColorClasses[note.color]}`}
+      className={`mb-5 break-inside-avoid overflow-hidden rounded-3xl border shadow-lg transition duration-300 hover:shadow-xl group ${noteColorClasses[note.color]}`}
     >
       {note.attachments.length > 0 ? (
         <div className="grid gap-1 bg-black/5 p-1 dark:bg-white/5">
@@ -82,25 +66,9 @@ export function NoteCard({ note }: NoteCardProps) {
         </div>
 
         {note.text ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-end">
-              <button
-                aria-label="Copy note text"
-                className="inline-flex items-center gap-1 rounded-full border border-current/20 px-2.5 py-1 text-xs font-medium transition hover:bg-black/5 dark:hover:bg-white/10"
-                onClick={handleCopy}
-                type="button"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-            <textarea
-              className="min-h-0 w-full resize-none bg-transparent p-0 text-sm leading-6 opacity-90 outline-none"
-              onChange={(event) => setEditableText(event.target.value)}
-              spellCheck={false}
-              value={editableText}
-            />
-          </div>
+          <p className="whitespace-pre-wrap text-sm leading-6 opacity-85">
+            {linkifyText(note.text)}
+          </p>
         ) : null}
 
         {note.listItems.length > 0 ? (
@@ -166,38 +134,18 @@ export function NoteCard({ note }: NoteCardProps) {
               {label}
             </span>
           ))}
+          <div className="ml-auto">
+            <button
+              onClick={handleCopy}
+              className="flex items-center justify-center rounded-full p-2 hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+              title="Copy note"
+              aria-label="Copy note text"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
         </footer>
       </div>
     </article>
   );
-}
-
-function readTextOverrides(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  const raw = window.localStorage.getItem(TEXT_OVERRIDES_STORAGE_KEY);
-  if (!raw) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
-    }
-
-    return parsed as Record<string, string>;
-  } catch {
-    return {};
-  }
-}
-
-function writeTextOverrides(overrides: Record<string, string>) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(TEXT_OVERRIDES_STORAGE_KEY, JSON.stringify(overrides));
 }
