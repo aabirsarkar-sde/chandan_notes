@@ -1,4 +1,7 @@
-import { Check, ExternalLink, ImageIcon, Pin } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
+import { Check, Copy, ExternalLink, ImageIcon, Pin } from "lucide-react";
 import Image from "next/image";
 import { formatNoteDate, linkifyText, noteColorClasses } from "@/lib/notes";
 import type { KeepNote } from "@/lib/types";
@@ -7,9 +10,44 @@ type NoteCardProps = {
   note: KeepNote;
 };
 
+const TEXT_OVERRIDES_STORAGE_KEY = "keep_archive_text_overrides";
+
 export function NoteCard({ note }: NoteCardProps) {
+  const [editableText, setEditableText] = useState(note.text || "");
+  const [copied, setCopied] = useState(false);
   const editedDate = formatNoteDate(note.editedAt || note.createdAt);
-  const hasBody = Boolean(note.text || note.listItems.length || note.annotations.length);
+  const hasBody = Boolean(editableText || note.listItems.length || note.annotations.length);
+
+  useEffect(() => {
+    const savedOverrides = readTextOverrides();
+    setEditableText(savedOverrides[note.id] ?? note.text ?? "");
+  }, [note.id, note.text]);
+
+  useEffect(() => {
+    const savedOverrides = readTextOverrides();
+    const originalText = note.text || "";
+
+    if (editableText === originalText) {
+      if (savedOverrides[note.id]) {
+        delete savedOverrides[note.id];
+        writeTextOverrides(savedOverrides);
+      }
+      return;
+    }
+
+    savedOverrides[note.id] = editableText;
+    writeTextOverrides(savedOverrides);
+  }, [editableText, note.id, note.text]);
+
+  async function handleCopy() {
+    if (!editableText) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(editableText);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
 
   return (
     <article
@@ -44,9 +82,26 @@ export function NoteCard({ note }: NoteCardProps) {
         </div>
 
         {note.text ? (
-          <p className="whitespace-pre-wrap text-sm leading-6 opacity-85">
-            {linkifyText(note.text)}
-          </p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide opacity-70">Text</p>
+              <button
+                aria-label="Copy note text"
+                className="inline-flex items-center gap-1 rounded-full border border-current/20 px-2.5 py-1 text-xs font-medium transition hover:bg-black/5 dark:hover:bg-white/10"
+                onClick={handleCopy}
+                type="button"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <textarea
+              className="min-h-24 w-full resize-y rounded-2xl border border-current/15 bg-transparent px-3 py-2 text-sm leading-6 opacity-90 outline-none transition focus:border-current/40 focus:ring-2 focus:ring-current/20"
+              onChange={(event) => setEditableText(event.target.value)}
+              spellCheck={false}
+              value={editableText}
+            />
+          </div>
         ) : null}
 
         {note.listItems.length > 0 ? (
@@ -116,4 +171,34 @@ export function NoteCard({ note }: NoteCardProps) {
       </div>
     </article>
   );
+}
+
+function readTextOverrides(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  const raw = window.localStorage.getItem(TEXT_OVERRIDES_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+
+    return parsed as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function writeTextOverrides(overrides: Record<string, string>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(TEXT_OVERRIDES_STORAGE_KEY, JSON.stringify(overrides));
 }
