@@ -30,13 +30,13 @@ export async function ensureNotesTable() {
   `;
 }
 
-export async function listOverrides() {
+export async function listOverrides(): Promise<DbNoteRow[]> {
   const sql = getSql();
-  const rows = await sql<DbNoteRow[]>`
+  const rows = await sql`
     SELECT id, title, text, deleted, updated_at
     FROM note_overrides
   `;
-  return rows;
+  return rows as DbNoteRow[];
 }
 
 export async function upsertNoteEdit(note: Pick<KeepNote, "id" | "title" | "text">) {
