@@ -33,6 +33,7 @@ export function ArchiveApp({ archive }: ArchiveAppProps) {
             id: string;
             title: string | null;
             text: string | null;
+            listItems: KeepNote["listItems"] | null;
             deleted: boolean;
           }>;
         };
@@ -51,6 +52,7 @@ export function ArchiveApp({ archive }: ArchiveAppProps) {
                 ...note,
                 title: override.title ?? note.title,
                 text: override.text ?? note.text,
+                listItems: override.listItems ?? note.listItems,
               };
             })
         );
@@ -81,6 +83,7 @@ export function ArchiveApp({ archive }: ArchiveAppProps) {
         id: updated.id,
         title: updated.title,
         text: updated.text,
+        listItems: updated.listItems,
       }),
     });
   }, []);

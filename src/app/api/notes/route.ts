@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { ensureNotesTable, listOverrides, markNoteDeleted, upsertNoteEdit } from "@/lib/db";
+import type { NoteListItem } from "@/lib/types";
 
 export async function GET() {
   try {
     await ensureNotesTable();
     const overrides = await listOverrides();
-    return NextResponse.json({ overrides });
+    return NextResponse.json({
+      overrides: overrides.map((override) => ({
+        id: override.id,
+        title: override.title,
+        text: override.text,
+        listItems: override.list_items,
+        deleted: override.deleted,
+      })),
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to load overrides" },
@@ -20,9 +29,15 @@ export async function PATCH(request: Request) {
       id?: string;
       title?: string;
       text?: string;
+      listItems?: NoteListItem[];
     };
 
-    if (!body.id || typeof body.title !== "string" || typeof body.text !== "string") {
+    if (
+      !body.id ||
+      typeof body.title !== "string" ||
+      typeof body.text !== "string" ||
+      !Array.isArray(body.listItems)
+    ) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
@@ -31,6 +46,7 @@ export async function PATCH(request: Request) {
       id: body.id,
       title: body.title,
       text: body.text,
+      listItems: body.listItems,
     });
 
     return NextResponse.json({ ok: true });
