@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MasonryGrid } from "@/components/MasonryGrid";
 import { SearchBar } from "@/components/SearchBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -12,10 +12,78 @@ type ArchiveAppProps = {
 };
 
 export function ArchiveApp({ archive }: ArchiveAppProps) {
+  const [notes, setNotes] = useState<KeepNote[]>(archive.notes);
   const [query, setQuery] = useState("");
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadOverrides() {
+      try {
+        const response = await fetch("/api/notes", { signal: controller.signal });
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as {
+          overrides: Array<{
+            id: string;
+            title: string | null;
+            text: string | null;
+            deleted: boolean;
+          }>;
+        };
+
+        const byId = new Map(data.overrides.map((item) => [item.id, item]));
+        setNotes(() =>
+          archive.notes
+            .filter((note) => !byId.get(note.id)?.deleted)
+            .map((note) => {
+              const override = byId.get(note.id);
+              if (!override) {
+                return note;
+              }
+
+              return {
+                ...note,
+                title: override.title ?? note.title,
+                text: override.text ?? note.text,
+              };
+            })
+        );
+      } catch {
+        // Ignore network errors and fall back to bundled notes.
+      }
+    }
+
+    void loadOverrides();
+    return () => controller.abort();
+  }, [archive.notes]);
+
+  const handleDelete = useCallback((id: string) => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    void fetch("/api/notes", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+  }, []);
+
+  const handleUpdate = useCallback((updated: KeepNote) => {
+    setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+    void fetch("/api/notes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: updated.id,
+        title: updated.title,
+        text: updated.text,
+      }),
+    });
+  }, []);
 
   useEffect(() => {
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -26,16 +94,16 @@ export function ArchiveApp({ archive }: ArchiveAppProps) {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
-  const labelCounts = useMemo(() => getLabelCounts(archive.notes), [archive.notes]);
+  const labelCounts = useMemo(() => getLabelCounts(notes), [notes]);
   const normalizedQuery = query.trim().toLowerCase();
 
   const filteredNotes = useMemo(() => {
-    return archive.notes
+    return notes
       .filter((note) => note.archived === showArchived)
       .filter((note) => !selectedLabel || note.labels.includes(selectedLabel))
       .filter((note) => !normalizedQuery || getNoteText(note).includes(normalizedQuery))
       .sort(sortNotes);
-  }, [archive.notes, normalizedQuery, selectedLabel, showArchived]);
+  }, [notes, normalizedQuery, selectedLabel, showArchived]);
 
   const pinnedNotes = filteredNotes.filter((note) => note.pinned);
   const otherNotes = filteredNotes.filter((note) => !note.pinned);
@@ -74,7 +142,7 @@ export function ArchiveApp({ archive }: ArchiveAppProps) {
                 </h2>
               </div>
               <p className="text-sm text-stone-600 dark:text-stone-400">
-                {archive.stats.total.toLocaleString()} notes imported from Google Keep
+                {notes.length.toLocaleString()} notes imported from Google Keep
               </p>
             </div>
           </div>
@@ -82,7 +150,7 @@ export function ArchiveApp({ archive }: ArchiveAppProps) {
           {pinnedNotes.length > 0 ? (
             <section className="space-y-4">
               <SectionHeading title="Pinned" count={pinnedNotes.length} />
-              <MasonryGrid notes={pinnedNotes} />
+              <MasonryGrid notes={pinnedNotes} onDelete={handleDelete} onUpdate={handleUpdate} />
             </section>
           ) : null}
 
@@ -91,7 +159,7 @@ export function ArchiveApp({ archive }: ArchiveAppProps) {
               count={otherNotes.length}
               title={pinnedNotes.length > 0 ? "Others" : "Notes"}
             />
-            <MasonryGrid notes={otherNotes} />
+            <MasonryGrid notes={otherNotes} onDelete={handleDelete} onUpdate={handleUpdate} />
           </section>
         </section>
       </div>

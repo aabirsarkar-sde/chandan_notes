@@ -10,6 +10,7 @@
     "process-notes": "node scripts/process-notes.js"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "date-fns": "4.1.0",
     "lucide-react": "0.544.0",
     "next": "14.2.35",

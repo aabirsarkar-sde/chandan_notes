@@ -1,8 +1,21 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Google Keep archive viewer built with Next.js.
 
 ## Getting Started
 
-First, run the development server:
+1) Install dependencies:
+
+```bash
+npm install
+```
+
+2) Configure the database for persistent edits/deletes:
+
+```bash
+cp .env.example .env.local
+# then set DATABASE_URL
+```
+
+3) Run the development server:
 
 ```bash
 npm run dev
@@ -15,6 +28,16 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Persistence API
+
+User edits and deletions are stored in Postgres through `src/app/api/notes/route.ts`.
+
+- `GET /api/notes` returns saved overrides/deletions.
+- `PATCH /api/notes` stores note text/title edits.
+- `DELETE /api/notes` marks a note as deleted.
+
+A `note_overrides` table is created automatically on first request.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
